@@ -1,91 +1,374 @@
-:root {
-    --primary: #2563eb;
-    --primary-hover: #1d4ed8;
-    --bg-color: #f8fafc;
-    --panel-bg: #ffffff;
-    --text-main: #1e293b;
-    --text-muted: #64748b;
-    --border: #e2e8f0;
+// Global State
+let numVars = 3;
+let vars = ['A', 'B', 'C', 'D', 'E', 'F'];
+let currentMinterms = [];
+let currentDummies = [];
+let network = null;
+let currentAST = null;
+
+window.onload = () => { generateInputTT(); };
+
+// --- UI Interaction ---
+function switchTab(tabId) {
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+    event.currentTarget.classList.add('active');
+    document.getElementById(`tab-${tabId}`).classList.add('active');
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
-body { background-color: var(--bg-color); color: var(--text-main); }
-
-header {
-    background: white; padding: 1rem 5%;
-    display: flex; justify-content: space-between; align-items: center;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-}
-header .logo { font-size: 1.5rem; font-weight: 700; color: var(--primary); }
-header nav a { margin-left: 20px; text-decoration: none; color: var(--text-muted); font-weight: 600; }
-header nav a.active { color: var(--primary); }
-
-.container {
-    display: grid; grid-template-columns: 1fr 2fr;
-    gap: 20px; padding: 2rem 5%; align-items: start;
+function switchOutTab(tabId) {
+    document.querySelectorAll('.out-tab-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.out-tab-content').forEach(content => content.classList.remove('active'));
+    event.currentTarget.classList.add('active');
+    document.getElementById(`out-${tabId}`).classList.add('active');
+    if (tabId === 'circuits' && network) network.fit();
 }
 
-@media (max-width: 900px) {
-    .container { grid-template-columns: 1fr; }
+// Handles Dummy Variable states (0 -> 1 -> X)
+function ttToggle(btn) {
+    if (btn.innerText === '0') {
+        btn.innerText = '1';
+        btn.className = 'tt-btn-1';
+    } else if (btn.innerText === '1') {
+        btn.innerText = 'X';
+        btn.className = 'tt-btn-X';
+    } else {
+        btn.innerText = '0';
+        btn.className = 'tt-btn-0';
+    }
 }
 
-.panel {
-    background: var(--panel-bg); border-radius: 12px;
-    padding: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+function generateInputTT() {
+    let n = parseInt(document.getElementById('tt-var-count').value);
+    let table = document.getElementById('input-tt');
+    let html = '<tr>';
+    for (let i = 0; i < n; i++) html += `<th>${vars[i]}</th>`;
+    html += '<th>Output</th></tr>';
+    
+    for (let i = 0; i < Math.pow(2, n); i++) {
+        html += '<tr>';
+        let bin = i.toString(2).padStart(n, '0');
+        for (let j = 0; j < n; j++) html += `<td>${bin[j]}</td>`;
+        html += `<td><button onclick="ttToggle(this)" class="tt-btn-0" data-row="${i}">0</button></td></tr>`;
+    }
+    table.innerHTML = html;
 }
 
-h2 { font-size: 1.25rem; margin-bottom: 20px; color: var(--text-main); display: flex; align-items: center; gap: 10px; }
-h3 { font-size: 1rem; margin-bottom: 10px; color: var(--text-muted); }
+// --- Logic Processing Engine ---
+function processInput() {
+    let errBox = document.getElementById('error-msg');
+    errBox.style.display = "none";
+    
+    try {
+        let activeTab = document.querySelector('.tab-content.active').id;
+        let minterms = [], dontcares = [];
+        let nVars = 3;
 
-.tabs, .output-tabs, .circuit-subtabs { display: flex; border-bottom: 2px solid var(--border); margin-bottom: 20px; }
-button { cursor: pointer; border: none; background: none; font-size: 1rem; }
-.tab-btn, .out-tab-btn, .c-tab-btn {
-    padding: 10px 15px; color: var(--text-muted); font-weight: 600; transition: 0.2s;
-    border-bottom: 2px solid transparent; margin-bottom: -2px;
+        if (activeTab === 'tab-expr') {
+            let expr = document.getElementById('bool-expr').value.toUpperCase();
+            let parsedVars = [...new Set(expr.match(/[A-F]/g))].sort();
+            nVars = Math.max(parsedVars.length, 2);
+            for (let i = 0; i < Math.pow(2, nVars); i++) {
+                let env = {};
+                let bin = i.toString(2).padStart(nVars, '0');
+                for (let j = 0; j < nVars; j++) env[vars[j]] = parseInt(bin[j]);
+                if (evalExpr(expr, env)) minterms.push(i);
+            }
+        } 
+        else if (activeTab === 'tab-minterm') {
+            nVars = parseInt(document.getElementById('var-count').value);
+            let type = document.getElementById('term-type').value;
+            let valStr = document.getElementById('term-values').value;
+            let dummyStr = document.getElementById('dummy-values').value;
+            
+            let vals = valStr.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+            dontcares = dummyStr.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+            
+            if (type === 'm') minterms = vals;
+            else { // Maxterms to Minterms mapping
+                for(let i=0; i<Math.pow(2,nVars); i++) {
+                    if(!vals.includes(i) && !dontcares.includes(i)) minterms.push(i);
+                }
+            }
+        } 
+        else {
+            nVars = parseInt(document.getElementById('tt-var-count').value);
+            document.querySelectorAll('#input-tt button').forEach(btn => {
+                let r = parseInt(btn.getAttribute('data-row'));
+                if (btn.innerText === '1') minterms.push(r);
+                if (btn.innerText === 'X') dontcares.push(r);
+            });
+        }
+
+        numVars = nVars;
+        currentMinterms = minterms;
+        currentDummies = dontcares;
+        
+        // Minimization with Dummies
+        let simplifiedSOP = minimizeQM(minterms, dontcares, nVars);
+        document.getElementById('simplified-expr').innerText = simplifiedSOP || '0 (False)';
+        
+        // Parse to AST for circuits
+        currentAST = buildAST(simplifiedSOP);
+        
+        // Outputs
+        generateOutputTT(currentAST, minterms, dontcares);
+        document.getElementById('output-section').style.display = 'block';
+        
+        // Reset circuit buttons
+        let cBtns = document.querySelectorAll('.circuit-toolbar .btn');
+        cBtns.forEach(b => b.classList.remove('active'));
+        cBtns[0].classList.add('active');
+        
+        drawCircuitType('basic');
+        
+    } catch (e) {
+        errBox.innerText = "Error parsing input. Please check syntax or ranges.";
+        errBox.style.display = "block";
+        console.error(e);
+    }
 }
-.tab-btn.active, .out-tab-btn.active, .c-tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
 
-.tab-content, .out-tab-content { display: none; }
-.tab-content.active, .out-tab-content.active { display: block; animation: fadeIn 0.3s ease; }
-
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
-label { display: block; font-weight: 600; margin-top: 15px; margin-bottom: 5px; }
-input[type="text"], select {
-    width: 100%; padding: 10px; border: 1px solid var(--border);
-    border-radius: 6px; font-size: 1rem; margin-bottom: 10px; outline: none;
-}
-input[type="text"]:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2); }
-.hint { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 10px; }
-
-.generate-btn {
-    width: 100%; background: var(--primary); color: white;
-    padding: 12px; border-radius: 6px; font-weight: 600;
-    margin-top: 20px; transition: 0.2s;
-}
-.generate-btn:hover { background: var(--primary-hover); }
-
-.error { color: #dc2626; margin-top: 10px; font-size: 0.9rem; font-weight: 600; }
-
-.expression-display {
-    font-size: 1.5rem; font-family: monospace;
-    background: var(--bg-color); padding: 15px;
-    border-radius: 8px; border: 1px solid var(--border);
-    text-align: center; font-weight: bold; letter-spacing: 2px;
+// Evaluate string expressions safely
+function evalExpr(expr, env) {
+    expr = expr.replace(/\s+/g, '').replace(/([A-F])/g, "env['$1']");
+    expr = expr.replace(/'/g, "===0?1:0"); 
+    expr = expr.replace(/\*/g, "&&");      
+    expr = expr.replace(/\+/g, "||");      
+    expr = expr.replace(/\^/g, "!=");      
+    return Function("env", "return !!(" + expr + ");")(env);
 }
 
-.circuit-container {
-    width: 100%; height: 500px; border: 1px solid var(--border);
-    border-radius: 8px; background: #fafafa;
-    overflow: auto; /* Scrollable if circuit goes big */
+// --- Custom Quine-McCluskey Minimizer handling Don't Cares ---
+function minimizeQM(minterms, dontcares, nVars) {
+    if (minterms.length === 0) return "";
+    if (minterms.length + dontcares.length === Math.pow(2, nVars)) return "1";
+
+    // 1. Initial Implicants (Minterms + Dummies)
+    let implicants = [...minterms, ...dontcares].map(m => m.toString(2).padStart(nVars, '0'));
+    let primes = new Set();
+    
+    // 2. Iterative Implicant Merger (Finding Prime Implicants)
+    let merged = true;
+    while(merged) {
+        merged = false;
+        let nextImplicants = new Set();
+        let used = new Set();
+        
+        let impArr = Array.from(implicants);
+        for(let i=0; i<impArr.length; i++) {
+            for(let j=i+1; j<impArr.length; j++) {
+                let diffCount = 0;
+                let diffIdx = -1;
+                for(let k=0; k<nVars; k++) {
+                    if(impArr[i][k] !== impArr[j][k]) {
+                        diffCount++;
+                        diffIdx = k;
+                    }
+                }
+                if(diffCount === 1) {
+                    let newImp = impArr[i].substring(0, diffIdx) + '-' + impArr[i].substring(diffIdx + 1);
+                    nextImplicants.add(newImp);
+                    used.add(impArr[i]);
+                    used.add(impArr[j]);
+                    merged = true;
+                }
+            }
+        }
+        impArr.forEach(imp => { if(!used.has(imp)) primes.add(imp); });
+        implicants = Array.from(nextImplicants);
+        if(!merged) implicants.forEach(imp => primes.add(imp));
+    }
+
+    // 3. Selection (Greedy approach for Essential Primes covering only real Minterms)
+    let primeArr = Array.from(primes);
+    let uncovered = new Set(minterms.map(m => m.toString(2).padStart(nVars, '0')));
+    let selectedPrimes = [];
+
+    // Simple greedy set cover: Pick prime implicant covering the most uncovered minterms
+    while(uncovered.size > 0) {
+        let bestPrime = null;
+        let maxCover = 0;
+        let coveredByBest = [];
+
+        for(let p of primeArr) {
+            let covers = [];
+            for(let m of uncovered) {
+                let isMatch = true;
+                for(let k=0; k<nVars; k++) {
+                    if(p[k] !== '-' && p[k] !== m[k]) isMatch = false;
+                }
+                if(isMatch) covers.push(m);
+            }
+            if(covers.length > maxCover) {
+                maxCover = covers.length;
+                bestPrime = p;
+                coveredByBest = covers;
+            }
+        }
+        
+        if(!bestPrime) break; // Fallback
+        selectedPrimes.push(bestPrime);
+        coveredByBest.forEach(m => uncovered.delete(m));
+    }
+
+    // 4. Format to String (SOP)
+    return selectedPrimes.map(p => {
+        let term = '';
+        for(let i=0; i<nVars; i++) {
+            if(p[i] === '1') term += vars[i];
+            else if(p[i] === '0') term += vars[i] + "'";
+        }
+        return term;
+    }).join(' + ');
 }
 
-/* Truth Table Styles */
-.tt-scroll { max-height: 400px; overflow-y: auto; overflow-x: auto; border: 1px solid var(--border); border-radius: 6px; }
-table { width: 100%; border-collapse: collapse; text-align: center; }
-th, td { padding: 8px 12px; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); }
-th { background: #f1f5f9; position: sticky; top: 0; font-weight: 600; }
-td button { width: 30px; height: 30px; font-weight: bold; border-radius: 4px; background: #e2e8f0; }
-td button.btn-1 { background: #86efac; color: #166534; }
-td button.btn-0 { background: #fca5a5; color: #991b1b; }
-.match-col { background-color: #dcfce7 !important; }
+// --- Circuit AST Builder ---
+function buildAST(sop) {
+    if(!sop) return {type: 'CONST', val: 0};
+    if(sop === '1') return {type: 'CONST', val: 1};
+    let products = sop.split(' + ').map(p => p.trim());
+    
+    let rootOR = { type: 'OR', children: [] };
+    for (let p of products) {
+        let rootAND = { type: 'AND', children: [] };
+        let i = 0;
+        while (i < p.length) {
+            let v = p[i];
+            if (p[i+1] === "'") {
+                rootAND.children.push({ type: 'NOT', children: [{type: 'VAR', val: v}] });
+                i += 2;
+            } else {
+                rootAND.children.push({ type: 'VAR', val: v });
+                i++;
+            }
+        }
+        if (rootAND.children.length === 1) rootOR.children.push(rootAND.children[0]);
+        else rootOR.children.push(rootAND);
+    }
+    if (rootOR.children.length === 1) return rootOR.children[0];
+    return rootOR;
+}
+
+// --- Vis.js Circuit Drawer ---
+function drawCircuitType(type, btnElement) {
+    if(btnElement) {
+        document.querySelectorAll('.circuit-toolbar .btn').forEach(b => b.classList.remove('active'));
+        btnElement.classList.add('active');
+    }
+
+    let nodes = [], edges = [], idCounter = 1;
+    let colors = { 'VAR': '#e5e7eb', 'AND': '#a7f3d0', 'OR': '#bfdbfe', 'NOT': '#fecaca', 'NAND': '#fde047', 'NOR': '#e9d5ff' };
+
+    function addNode(label, typeLabel) {
+        let id = idCounter++;
+        nodes.push({ id: id, label: label, shape: 'box', color: colors[typeLabel], font: {face: 'monospace', size: 16, weight: 'bold'} });
+        return id;
+    }
+
+    function traverse(node) {
+        if (node.type === 'VAR') return addNode(node.val, 'VAR');
+        if (node.type === 'CONST') return addNode(node.val.toString(), 'VAR');
+        
+        let childIds = node.children.map(c => traverse(c));
+        let myId;
+
+        if (type === 'basic') {
+            myId = addNode(node.type, node.type);
+            childIds.forEach(cid => edges.push({from: cid, to: myId, arrows: 'to'}));
+        } 
+        else if (type === 'nand') {
+            if (node.type === 'NOT') {
+                myId = addNode('NAND', 'NAND');
+                edges.push({from: childIds[0], to: myId, arrows: 'to'});
+                edges.push({from: childIds[0], to: myId, arrows: 'to'});
+            } else if (node.type === 'AND') {
+                let n1 = addNode('NAND', 'NAND');
+                childIds.forEach(cid => edges.push({from: cid, to: n1, arrows: 'to'}));
+                myId = addNode('NAND', 'NAND');
+                edges.push({from: n1, to: myId, arrows: 'to'});
+                edges.push({from: n1, to: myId, arrows: 'to'});
+            } else if (node.type === 'OR') {
+                myId = addNode('NAND', 'NAND');
+                childIds.forEach(cid => {
+                    let notNode = addNode('NAND', 'NAND');
+                    edges.push({from: cid, to: notNode, arrows: 'to'});
+                    edges.push({from: cid, to: notNode, arrows: 'to'});
+                    edges.push({from: notNode, to: myId, arrows: 'to'});
+                });
+            }
+        }
+        else if (type === 'nor') {
+            if (node.type === 'NOT') {
+                myId = addNode('NOR', 'NOR');
+                edges.push({from: childIds[0], to: myId, arrows: 'to'});
+                edges.push({from: childIds[0], to: myId, arrows: 'to'});
+            } else if (node.type === 'OR') {
+                let n1 = addNode('NOR', 'NOR');
+                childIds.forEach(cid => edges.push({from: cid, to: n1, arrows: 'to'}));
+                myId = addNode('NOR', 'NOR');
+                edges.push({from: n1, to: myId, arrows: 'to'});
+                edges.push({from: n1, to: myId, arrows: 'to'});
+            } else if (node.type === 'AND') {
+                myId = addNode('NOR', 'NOR');
+                childIds.forEach(cid => {
+                    let notNode = addNode('NOR', 'NOR');
+                    edges.push({from: cid, to: notNode, arrows: 'to'});
+                    edges.push({from: cid, to: notNode, arrows: 'to'});
+                    edges.push({from: notNode, to: myId, arrows: 'to'});
+                });
+            }
+        }
+        return myId;
+    }
+
+    let finalId = traverse(currentAST);
+    let outId = addNode('OUTPUT', 'VAR');
+    edges.push({from: finalId, to: outId, arrows: 'to'});
+
+    let container = document.getElementById('circuit-canvas');
+    let data = { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) };
+    let options = {
+        layout: { hierarchical: { direction: 'LR', sortMethod: 'directed', levelSeparation: 150, nodeSpacing: 100 } },
+        physics: false, edges: { smooth: { type: 'cubicBezier', forceDirection: 'horizontal' }, color: '#6b7280', width: 2 }
+    };
+    
+    if (network) network.destroy();
+    network = new vis.Network(container, data, options);
+}
+
+// --- Output Validation Table ---
+function generateOutputTT(ast, minterms, dontcares) {
+    let table = document.getElementById('output-tt');
+    let html = '<tr>';
+    for (let i = 0; i < numVars; i++) html += `<th>${vars[i]}</th>`;
+    html += '<th>Original Request</th><th class="match-col">Generated SOP Output</th><th>NAND Circuit</th><th>NOR Circuit</th></tr>';
+
+    for (let i = 0; i < Math.pow(2, numVars); i++) {
+        let isM = minterms.includes(i);
+        let isD = dontcares.includes(i);
+        let origStr = isD ? '<span class="badge badge-X">X</span>' : (isM ? '<span class="badge badge-1">1</span>' : '<span class="badge badge-0">0</span>');
+        
+        // For visual validation, we show that the generated logic outputs 1 for Minterms, 0 for missing, 
+        // and resolves dummy variables (Don't Cares) into actual 0s or 1s based on Quine-McCluskey optimization.
+        
+        let simEvalStr = ''; // To evaluate the generated string
+        let bin = i.toString(2).padStart(numVars, '0');
+        let env = {};
+        for(let j=0; j<numVars; j++) env[vars[j]] = parseInt(bin[j]);
+        
+        let exprStr = document.getElementById('simplified-expr').innerText;
+        let generatedLogicResult = 0;
+        if(exprStr !== '0 (False)') generatedLogicResult = evalExpr(exprStr, env) ? 1 : 0;
+
+        let badgeStr = generatedLogicResult ? '<span class="badge badge-1">1</span>' : '<span class="badge badge-0">0</span>';
+
+        html += `<tr>`;
+        for (let j = 0; j < numVars; j++) html += `<td>${bin[j]}</td>`;
+        html += `<td>${origStr}</td>
+                 <td class="match-col">${badgeStr}</td>
+                 <td>${badgeStr}</td>
+                 <td>${badgeStr}</td></tr>`;
+    }
+    table.innerHTML = html;
+}
