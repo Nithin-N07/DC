@@ -1,4 +1,4 @@
-// Global State
+// Global State Variables
 let numVars = 3;
 let vars = ['A', 'B', 'C', 'D', 'E', 'F'];
 let currentMinterms = [];
@@ -6,25 +6,28 @@ let currentDummies = [];
 let network = null;
 let currentAST = null;
 
+// Initialize truth table on page load
 window.onload = () => { generateInputTT(); };
 
-// --- UI Interaction ---
-function switchTab(tabId) {
+// --- UI Interaction & Tab Switching ---
+function switchTab(tabId, btnElement) {
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-    event.currentTarget.classList.add('active');
+    
+    if(btnElement) btnElement.classList.add('active');
     document.getElementById(`tab-${tabId}`).classList.add('active');
 }
 
-function switchOutTab(tabId) {
+function switchOutTab(tabId, btnElement) {
     document.querySelectorAll('.out-tab-btn').forEach(btn => btn.classList.remove('active'));
     document.querySelectorAll('.out-tab-content').forEach(content => content.classList.remove('active'));
-    event.currentTarget.classList.add('active');
+    
+    if(btnElement) btnElement.classList.add('active');
     document.getElementById(`out-${tabId}`).classList.add('active');
+    
     if (tabId === 'circuits' && network) network.fit();
 }
 
-// Handles Dummy Variable states (0 -> 1 -> X)
 function ttToggle(btn) {
     if (btn.innerText === '0') {
         btn.innerText = '1';
@@ -54,7 +57,7 @@ function generateInputTT() {
     table.innerHTML = html;
 }
 
-// --- Logic Processing Engine ---
+// --- Main Logic Processing Engine ---
 function processInput() {
     let errBox = document.getElementById('error-msg');
     errBox.style.display = "none";
@@ -84,9 +87,11 @@ function processInput() {
             let vals = valStr.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
             dontcares = dummyStr.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
             
-            if (type === 'm') minterms = vals;
-            else { // Maxterms to Minterms mapping
-                for(let i=0; i<Math.pow(2,nVars); i++) {
+            if (type === 'm') {
+                minterms = vals;
+            } else { 
+                // Maxterms to Minterms mapping
+                for(let i = 0; i < Math.pow(2, nVars); i++) {
                     if(!vals.includes(i) && !dontcares.includes(i)) minterms.push(i);
                 }
             }
@@ -104,21 +109,21 @@ function processInput() {
         currentMinterms = minterms;
         currentDummies = dontcares;
         
-        // Minimization with Dummies
+        // Quine-McCluskey Minimization with Don't Cares
         let simplifiedSOP = minimizeQM(minterms, dontcares, nVars);
         document.getElementById('simplified-expr').innerText = simplifiedSOP || '0 (False)';
         
-        // Parse to AST for circuits
+        // Parse AST for Circuit Rendering
         currentAST = buildAST(simplifiedSOP);
         
-        // Outputs
+        // Render Outputs
         generateOutputTT(currentAST, minterms, dontcares);
         document.getElementById('output-section').style.display = 'block';
         
-        // Reset circuit buttons
+        // Reset and draw basic circuit
         let cBtns = document.querySelectorAll('.circuit-toolbar .btn');
         cBtns.forEach(b => b.classList.remove('active'));
-        cBtns[0].classList.add('active');
+        if(cBtns.length > 0) cBtns[0].classList.add('active');
         
         drawCircuitType('basic');
         
@@ -139,16 +144,14 @@ function evalExpr(expr, env) {
     return Function("env", "return !!(" + expr + ");")(env);
 }
 
-// --- Custom Quine-McCluskey Minimizer handling Don't Cares ---
+// --- Custom Quine-McCluskey Minimizer ---
 function minimizeQM(minterms, dontcares, nVars) {
     if (minterms.length === 0) return "";
     if (minterms.length + dontcares.length === Math.pow(2, nVars)) return "1";
 
-    // 1. Initial Implicants (Minterms + Dummies)
     let implicants = [...minterms, ...dontcares].map(m => m.toString(2).padStart(nVars, '0'));
     let primes = new Set();
     
-    // 2. Iterative Implicant Merger (Finding Prime Implicants)
     let merged = true;
     while(merged) {
         merged = false;
@@ -180,12 +183,10 @@ function minimizeQM(minterms, dontcares, nVars) {
         if(!merged) implicants.forEach(imp => primes.add(imp));
     }
 
-    // 3. Selection (Greedy approach for Essential Primes covering only real Minterms)
     let primeArr = Array.from(primes);
     let uncovered = new Set(minterms.map(m => m.toString(2).padStart(nVars, '0')));
     let selectedPrimes = [];
 
-    // Simple greedy set cover: Pick prime implicant covering the most uncovered minterms
     while(uncovered.size > 0) {
         let bestPrime = null;
         let maxCover = 0;
@@ -207,12 +208,11 @@ function minimizeQM(minterms, dontcares, nVars) {
             }
         }
         
-        if(!bestPrime) break; // Fallback
+        if(!bestPrime) break; 
         selectedPrimes.push(bestPrime);
         coveredByBest.forEach(m => uncovered.delete(m));
     }
 
-    // 4. Format to String (SOP)
     return selectedPrimes.map(p => {
         let term = '';
         for(let i=0; i<nVars; i++) {
@@ -342,24 +342,21 @@ function generateOutputTT(ast, minterms, dontcares) {
     let table = document.getElementById('output-tt');
     let html = '<tr>';
     for (let i = 0; i < numVars; i++) html += `<th>${vars[i]}</th>`;
-    html += '<th>Original Request</th><th class="match-col">Generated SOP Output</th><th>NAND Circuit</th><th>NOR Circuit</th></tr>';
+    html += '<th>Original Request</th><th class="match-col">Generated Output</th><th>NAND Equiv</th><th>NOR Equiv</th></tr>';
 
     for (let i = 0; i < Math.pow(2, numVars); i++) {
         let isM = minterms.includes(i);
         let isD = dontcares.includes(i);
         let origStr = isD ? '<span class="badge badge-X">X</span>' : (isM ? '<span class="badge badge-1">1</span>' : '<span class="badge badge-0">0</span>');
         
-        // For visual validation, we show that the generated logic outputs 1 for Minterms, 0 for missing, 
-        // and resolves dummy variables (Don't Cares) into actual 0s or 1s based on Quine-McCluskey optimization.
-        
-        let simEvalStr = ''; // To evaluate the generated string
+        let simEvalStr = '';
         let bin = i.toString(2).padStart(numVars, '0');
         let env = {};
         for(let j=0; j<numVars; j++) env[vars[j]] = parseInt(bin[j]);
         
         let exprStr = document.getElementById('simplified-expr').innerText;
         let generatedLogicResult = 0;
-        if(exprStr !== '0 (False)') generatedLogicResult = evalExpr(exprStr, env) ? 1 : 0;
+        if(exprStr !== '0 (False)' && exprStr !== '') generatedLogicResult = evalExpr(exprStr, env) ? 1 : 0;
 
         let badgeStr = generatedLogicResult ? '<span class="badge badge-1">1</span>' : '<span class="badge badge-0">0</span>';
 
