@@ -28,11 +28,12 @@ body { background-color: var(--bg-page); color: var(--text-dark); line-height: 1
 .card-header p { color: var(--text-muted); margin-bottom: 1.5rem; font-size: 0.95rem; }
 
 /* Tabs */
-.tab-navigation { display: flex; border-bottom: 2px solid var(--border-color); margin-bottom: 1.5rem; gap: 1rem; }
+.tab-navigation { display: flex; border-bottom: 2px solid var(--border-color); margin-bottom: 1.5rem; gap: 1rem; flex-wrap: wrap; }
 .tab-btn, .out-tab-btn { background: none; border: none; padding: 0.75rem 1rem; font-size: 1rem; font-weight: 500; color: var(--text-muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: 0.2s; }
 .tab-btn:hover, .out-tab-btn:hover { color: var(--text-dark); }
 .tab-btn.active, .out-tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
 
+/* Hide inactive tabs */
 .tab-content, .out-tab-content { display: none; animation: fadeIn 0.3s ease; }
 .tab-content.active, .out-tab-content.active { display: block; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
@@ -40,10 +41,10 @@ body { background-color: var(--bg-page); color: var(--text-dark); line-height: 1
 /* Inputs */
 .input-group { margin-bottom: 1.25rem; flex: 1; }
 .input-group label { display: block; font-weight: 600; margin-bottom: 0.5rem; font-size: 0.95rem; }
-.input-row { display: flex; gap: 1rem; }
-.term-selector { display: flex; }
-.term-selector select { border-radius: 6px 0 0 6px; border-right: none; width: auto; }
-.term-selector input { border-radius: 0 6px 6px 0; }
+.input-row { display: flex; gap: 1rem; flex-wrap: wrap; }
+.term-selector { display: flex; width: 100%; }
+.term-selector select { border-radius: 6px 0 0 6px; border-right: none; width: auto; background: #f9fafb; }
+.term-selector input { border-radius: 0 6px 6px 0; flex: 1; }
 .form-control { width: 100%; padding: 0.75rem 1rem; border: 1px solid var(--border-color); border-radius: 6px; font-size: 1rem; outline: none; transition: border-color 0.2s; }
 .form-control:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1); }
 small { color: var(--text-muted); font-size: 0.85rem; display: block; margin-top: 0.25rem; }
@@ -65,22 +66,22 @@ small { color: var(--text-muted); font-size: 0.85rem; display: block; margin-top
 .result-banner span { color: var(--primary); font-weight: 600; font-size: 0.95rem; text-transform: uppercase; letter-spacing: 1px; }
 .final-expression { font-size: 2rem; font-weight: 700; font-family: monospace; color: var(--text-dark); margin-top: 0.5rem; letter-spacing: 2px; }
 
-/* Circuit */
+/* Circuit Canvas */
 .circuit-toolbar { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
 .circuit-canvas-wrapper { border: 1px solid var(--border-color); border-radius: 8px; background: #fafafa; overflow: hidden; }
 #circuit-canvas { width: 100%; height: 500px; }
 
 /* Truth Table */
-.tt-wrapper { max-height: 400px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; box-shadow: inset 0 0 5px rgba(0,0,0,0.02); }
-.truth-table { width: 100%; border-collapse: collapse; text-align: center; background: white; }
+.tt-wrapper { max-height: 400px; overflow-y: auto; overflow-x: auto; border: 1px solid var(--border-color); border-radius: 8px; box-shadow: inset 0 0 5px rgba(0,0,0,0.02); }
+.truth-table { width: 100%; border-collapse: collapse; text-align: center; background: white; min-width: 500px; }
 .truth-table th, .truth-table td { padding: 10px; border-bottom: 1px solid var(--border-color); border-right: 1px solid var(--border-color); }
 .truth-table th { background: #f9fafb; font-weight: 600; position: sticky; top: 0; z-index: 10; box-shadow: 0 1px 0 var(--border-color); }
 .truth-table button { width: 35px; height: 35px; font-weight: bold; border-radius: 6px; border: none; cursor: pointer; transition: 0.1s; }
 
-/* Truth Table states */
+/* Truth Table Button States */
 .tt-btn-0 { background: #fee2e2; color: #b91c1c; }
 .tt-btn-1 { background: #d1fae5; color: #047857; }
-.tt-btn-X { background: #f3f4f6; color: #4b5563; } /* Dummy state */
+.tt-btn-X { background: #f3f4f6; color: #4b5563; }
 
 .legend { margin-top: 10px; font-size: 0.9rem; color: var(--text-muted); }
 .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 0.8rem; }
