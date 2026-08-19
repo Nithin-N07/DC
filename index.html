@@ -14,8 +14,8 @@
     <!-- Vis.js for Circuit Rendering -->
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     
-    <!-- IMPORTANT: Link to your CSS file. The "./" ensures it looks in the same folder -->
-    <link rel="stylesheet" href="./style.css">
+    <!-- Link to your CSS file -->
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <header class="navbar">
@@ -113,7 +113,7 @@
             </div>
 
             <div class="result-banner">
-                <span>Simplified Boolean Expression:</span>
+                <span>Simplified Boolean Expression (SOP):</span>
                 <div class="final-expression" id="simplified-expr"></div>
             </div>
 
@@ -127,8 +127,8 @@
             <div id="out-circuits" class="out-tab-content active">
                 <div class="circuit-toolbar">
                     <button class="btn btn-outline active" onclick="drawCircuitType('basic', this)">Basic Logic Gates</button>
-                    <button class="btn btn-outline" onclick="drawCircuitType('nand', this)">NAND-Only</button>
-                    <button class="btn btn-outline" onclick="drawCircuitType('nor', this)">NOR-Only</button>
+                    <button class="btn btn-outline" onclick="drawCircuitType('nand', this)">NAND-Only Implementation</button>
+                    <button class="btn btn-outline" onclick="drawCircuitType('nor', this)">NOR-Only Implementation</button>
                 </div>
                 <div class="circuit-canvas-wrapper">
                     <div id="circuit-canvas"></div>
@@ -144,7 +144,7 @@
         </section>
     </main>
 
-    <!-- IMPORTANT: Link to your JS file -->
-    <script src="./script.js"></script>
+    <!-- Link to your JS file -->
+    <script src="script.js"></script>
 </body>
 </html>
