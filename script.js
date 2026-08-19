@@ -1,283 +1,90 @@
-// Global State
-let numVars = 3;
-let vars = ['A', 'B', 'C', 'D', 'E', 'F'];
-let currentMinterms = [];
-let network = null;
-let currentAST = null;
-
-window.onload = () => { generateInputTT(); };
-
-// --- UI Logic ---
-function switchTab(tabId) {
-    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-    event.target.classList.add('active');
-    document.getElementById(`tab-${tabId}`).classList.add('active');
+:root {
+    --bg-page: #f4f7fb;
+    --bg-card: #ffffff;
+    --primary: #4f46e5;
+    --primary-hover: #4338ca;
+    --text-dark: #111827;
+    --text-muted: #6b7280;
+    --border-color: #e5e7eb;
+    --green: #10b981;
+    --red: #ef4444;
+    --gray: #9ca3af;
 }
 
-function switchOutTab(tabId) {
-    document.querySelectorAll('.out-tab-btn').forEach(btn => btn.classList.remove('active'));
-    document.querySelectorAll('.out-tab-content').forEach(content => content.classList.remove('active'));
-    event.target.classList.add('active');
-    document.getElementById(`out-${tabId}`).classList.add('active');
-    if (tabId === 'circuits' && network) network.fit();
-}
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+body { background-color: var(--bg-page); color: var(--text-dark); line-height: 1.6; }
 
-function ttToggle(btn) {
-    let val = btn.innerText;
-    btn.innerText = val === '0' ? '1' : val === '1' ? 'X' : '0';
-    btn.className = `btn-${btn.innerText}`;
-}
+/* Navbar */
+.navbar { background: var(--bg-card); border-bottom: 1px solid var(--border-color); padding: 1rem 0; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+.nav-container { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; padding: 0 20px; }
+.brand { font-size: 1.25rem; font-weight: 700; color: var(--primary); display: flex; gap: 8px; align-items: center; }
+.nav-links a { text-decoration: none; color: var(--text-muted); font-weight: 500; margin-left: 20px; }
+.nav-links a.active { color: var(--primary); }
 
-function generateInputTT() {
-    let n = parseInt(document.getElementById('tt-var-count').value);
-    let table = document.getElementById('input-tt');
-    let html = '<tr>';
-    for (let i = 0; i < n; i++) html += `<th>${vars[i]}</th>`;
-    html += '<th>Output</th></tr>';
-    
-    for (let i = 0; i < Math.pow(2, n); i++) {
-        html += '<tr>';
-        let bin = i.toString(2).padStart(n, '0');
-        for (let j = 0; j < n; j++) html += `<td>${bin[j]}</td>`;
-        html += `<td><button onclick="ttToggle(this)" class="btn-0" data-row="${i}">0</button></td></tr>`;
-    }
-    table.innerHTML = html;
-}
+/* Main Layout */
+.main-container { max-width: 1000px; margin: 2rem auto; padding: 0 20px; }
+.card { background: var(--bg-card); border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06); padding: 2rem; margin-bottom: 2rem; border: 1px solid var(--border-color); }
+.card-header h2 { font-size: 1.5rem; color: var(--text-dark); margin-bottom: 0.2rem; }
+.card-header p { color: var(--text-muted); margin-bottom: 1.5rem; font-size: 0.95rem; }
 
-// --- Main Processing ---
-function processInput() {
-    document.getElementById('error-msg').innerText = "";
-    try {
-        let activeTab = document.querySelector('.tab-content.active').id;
-        let minterms = [], dontcares = [];
-        let nVars = 3;
+/* Tabs */
+.tab-navigation { display: flex; border-bottom: 2px solid var(--border-color); margin-bottom: 1.5rem; gap: 1rem; }
+.tab-btn, .out-tab-btn { background: none; border: none; padding: 0.75rem 1rem; font-size: 1rem; font-weight: 500; color: var(--text-muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: 0.2s; }
+.tab-btn:hover, .out-tab-btn:hover { color: var(--text-dark); }
+.tab-btn.active, .out-tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
 
-        if (activeTab === 'tab-expr') {
-            let expr = document.getElementById('bool-expr').value.toUpperCase();
-            let parsedVars = [...new Set(expr.match(/[A-F]/g))].sort();
-            nVars = Math.max(parsedVars.length, 2);
-            for (let i = 0; i < Math.pow(2, nVars); i++) {
-                let env = {};
-                let bin = i.toString(2).padStart(nVars, '0');
-                for (let j = 0; j < nVars; j++) env[vars[j]] = parseInt(bin[j]);
-                if (evalExpr(expr, env)) minterms.push(i);
-            }
-        } 
-        else if (activeTab === 'tab-minterm') {
-            nVars = parseInt(document.getElementById('var-count').value);
-            let type = document.getElementById('term-type').value;
-            let valStr = document.getElementById('term-values').value;
-            let vals = valStr.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
-            
-            if (type === 'm') minterms = vals;
-            else {
-                for(let i=0; i<Math.pow(2,nVars); i++) {
-                    if(!vals.includes(i)) minterms.push(i);
-                }
-            }
-        } 
-        else {
-            nVars = parseInt(document.getElementById('tt-var-count').value);
-            document.querySelectorAll('#input-tt button').forEach(btn => {
-                let r = parseInt(btn.getAttribute('data-row'));
-                if (btn.innerText === '1') minterms.push(r);
-                if (btn.innerText === 'X') dontcares.push(r);
-            });
-        }
+.tab-content, .out-tab-content { display: none; animation: fadeIn 0.3s ease; }
+.tab-content.active, .out-tab-content.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
-        numVars = nVars;
-        currentMinterms = minterms;
-        
-        // Minimize using Quine-McCluskey (Simplified Greedy Approach for JS)
-        let simplifiedSOP = minimize(minterms, dontcares, nVars);
-        document.getElementById('simplified-expr').innerText = simplifiedSOP || '0 (False)';
-        
-        // Parse Simplified to AST
-        currentAST = buildAST(simplifiedSOP);
-        
-        // Generate Outputs
-        generateOutputTT(currentAST, minterms, dontcares);
-        document.getElementById('output-section').style.display = 'block';
-        drawCircuitType('basic');
-        
-    } catch (e) {
-        document.getElementById('error-msg').innerText = "Error: Invalid Input. Please check your expression.";
-        console.error(e);
-    }
-}
+/* Inputs */
+.input-group { margin-bottom: 1.25rem; flex: 1; }
+.input-group label { display: block; font-weight: 600; margin-bottom: 0.5rem; font-size: 0.95rem; }
+.input-row { display: flex; gap: 1rem; }
+.term-selector { display: flex; }
+.term-selector select { border-radius: 6px 0 0 6px; border-right: none; width: auto; }
+.term-selector input { border-radius: 0 6px 6px 0; }
+.form-control { width: 100%; padding: 0.75rem 1rem; border: 1px solid var(--border-color); border-radius: 6px; font-size: 1rem; outline: none; transition: border-color 0.2s; }
+.form-control:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1); }
+small { color: var(--text-muted); font-size: 0.85rem; display: block; margin-top: 0.25rem; }
+.large-input { font-size: 1.1rem; padding: 1rem; font-family: monospace; }
 
-// --- Expression Parsing & Evaluation ---
-function evalExpr(expr, env) {
-    expr = expr.replace(/\s+/g, '').replace(/([A-F])/g, "env['$1']");
-    expr = expr.replace(/'/g, "===0?1:0"); // NOT
-    expr = expr.replace(/\*/g, "&&");      // AND
-    expr = expr.replace(/\+/g, "||");      // OR
-    expr = expr.replace(/\^/g, "!=");      // XOR
-    return Function("env", "return !!(" + expr + ");")(env);
-}
+/* Buttons */
+.btn { padding: 0.75rem 1.5rem; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 1rem; border: none; transition: 0.2s; }
+.btn-primary { background: var(--primary); color: white; }
+.btn-primary:hover { background: var(--primary-hover); }
+.btn-block { width: 100%; margin-top: 1rem; padding: 1rem; font-size: 1.1rem; }
+.btn-outline { background: white; border: 1px solid var(--border-color); color: var(--text-dark); }
+.btn-outline:hover { border-color: var(--primary); color: var(--primary); }
+.btn-outline.active { background: var(--primary); color: white; border-color: var(--primary); }
 
-// --- Minimizer (Quine-McCluskey logic mapping) ---
-function minimize(minterms, dontcares, n) {
-    if (minterms.length === 0) return "";
-    if (minterms.length + dontcares.length === Math.pow(2, n)) return "1";
-    
-    // Convert to SOP (Sum of Products) strings for rendering simplicity
-    // A fully robust QM is 500+ lines. Here we do a basic reduction for standard equations.
-    let terms = minterms.map(m => {
-        let bin = m.toString(2).padStart(n, '0');
-        let term = '';
-        for(let i=0; i<n; i++) {
-            term += bin[i] === '1' ? vars[i] : vars[i]+"'";
-        }
-        return term;
-    });
-    return terms.join(' + '); // Replace with true QM if aggressive minimization is needed
-}
+.error-alert { background: #fee2e2; color: #b91c1c; padding: 1rem; border-radius: 6px; margin-top: 1rem; font-weight: 500; border: 1px solid #f87171; }
 
-// --- AST Builder for Circuits ---
-function buildAST(sop) {
-    if(!sop) return {type: 'CONST', val: 0};
-    if(sop === '1') return {type: 'CONST', val: 1};
-    let products = sop.split(' + ').map(p => p.trim());
-    
-    let rootOR = { type: 'OR', children: [] };
-    for (let p of products) {
-        let rootAND = { type: 'AND', children: [] };
-        let i = 0;
-        while (i < p.length) {
-            let v = p[i];
-            if (p[i+1] === "'") {
-                rootAND.children.push({ type: 'NOT', children: [{type: 'VAR', val: v}] });
-                i += 2;
-            } else {
-                rootAND.children.push({ type: 'VAR', val: v });
-                i++;
-            }
-        }
-        if (rootAND.children.length === 1) rootOR.children.push(rootAND.children[0]);
-        else rootOR.children.push(rootAND);
-    }
-    if (rootOR.children.length === 1) return rootOR.children[0];
-    return rootOR;
-}
+/* Results */
+.result-banner { background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 8px; padding: 1.5rem; text-align: center; margin-bottom: 2rem; }
+.result-banner span { color: var(--primary); font-weight: 600; font-size: 0.95rem; text-transform: uppercase; letter-spacing: 1px; }
+.final-expression { font-size: 2rem; font-weight: 700; font-family: monospace; color: var(--text-dark); margin-top: 0.5rem; letter-spacing: 2px; }
 
-// --- Circuit Rendering using Vis.js ---
-function drawCircuitType(type) {
-    document.querySelectorAll('.c-tab-btn').forEach(b => b.classList.remove('active'));
-    event.target.classList.add('active');
+/* Circuit */
+.circuit-toolbar { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.circuit-canvas-wrapper { border: 1px solid var(--border-color); border-radius: 8px; background: #fafafa; overflow: hidden; }
+#circuit-canvas { width: 100%; height: 500px; }
 
-    let nodes = [];
-    let edges = [];
-    let idCounter = 1;
+/* Truth Table */
+.tt-wrapper { max-height: 400px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; box-shadow: inset 0 0 5px rgba(0,0,0,0.02); }
+.truth-table { width: 100%; border-collapse: collapse; text-align: center; background: white; }
+.truth-table th, .truth-table td { padding: 10px; border-bottom: 1px solid var(--border-color); border-right: 1px solid var(--border-color); }
+.truth-table th { background: #f9fafb; font-weight: 600; position: sticky; top: 0; z-index: 10; box-shadow: 0 1px 0 var(--border-color); }
+.truth-table button { width: 35px; height: 35px; font-weight: bold; border-radius: 6px; border: none; cursor: pointer; transition: 0.1s; }
 
-    let colors = {
-        'VAR': '#e2e8f0', 'AND': '#86efac', 'OR': '#93c5fd', 
-        'NOT': '#fca5a5', 'NAND': '#fde047', 'NOR': '#d8b4fe'
-    };
+/* Truth Table states */
+.tt-btn-0 { background: #fee2e2; color: #b91c1c; }
+.tt-btn-1 { background: #d1fae5; color: #047857; }
+.tt-btn-X { background: #f3f4f6; color: #4b5563; } /* Dummy state */
 
-    function addNode(label, typeLabel) {
-        let id = idCounter++;
-        nodes.push({ id: id, label: label, shape: 'box', color: colors[typeLabel], font: {face: 'monospace', size: 16} });
-        return id;
-    }
-
-    // Convert AST based on type
-    function traverse(node) {
-        if (node.type === 'VAR') return addNode(node.val, 'VAR');
-        
-        let childIds = node.children.map(c => traverse(c));
-        let myId;
-
-        if (type === 'basic') {
-            myId = addNode(node.type, node.type);
-            childIds.forEach(cid => edges.push({from: cid, to: myId, arrows: 'to'}));
-        } 
-        else if (type === 'nand') {
-            if (node.type === 'NOT') {
-                myId = addNode('NAND', 'NAND');
-                edges.push({from: childIds[0], to: myId, arrows: 'to'});
-                edges.push({from: childIds[0], to: myId, arrows: 'to'});
-            } else if (node.type === 'AND') {
-                let n1 = addNode('NAND', 'NAND');
-                childIds.forEach(cid => edges.push({from: cid, to: n1, arrows: 'to'}));
-                myId = addNode('NAND', 'NAND');
-                edges.push({from: n1, to: myId, arrows: 'to'});
-                edges.push({from: n1, to: myId, arrows: 'to'});
-            } else if (node.type === 'OR') {
-                myId = addNode('NAND', 'NAND');
-                childIds.forEach(cid => {
-                    let notNode = addNode('NAND', 'NAND');
-                    edges.push({from: cid, to: notNode, arrows: 'to'});
-                    edges.push({from: cid, to: notNode, arrows: 'to'});
-                    edges.push({from: notNode, to: myId, arrows: 'to'});
-                });
-            }
-        }
-        else if (type === 'nor') {
-            if (node.type === 'NOT') {
-                myId = addNode('NOR', 'NOR');
-                edges.push({from: childIds[0], to: myId, arrows: 'to'});
-                edges.push({from: childIds[0], to: myId, arrows: 'to'});
-            } else if (node.type === 'OR') {
-                let n1 = addNode('NOR', 'NOR');
-                childIds.forEach(cid => edges.push({from: cid, to: n1, arrows: 'to'}));
-                myId = addNode('NOR', 'NOR');
-                edges.push({from: n1, to: myId, arrows: 'to'});
-                edges.push({from: n1, to: myId, arrows: 'to'});
-            } else if (node.type === 'AND') {
-                myId = addNode('NOR', 'NOR');
-                childIds.forEach(cid => {
-                    let notNode = addNode('NOR', 'NOR');
-                    edges.push({from: cid, to: notNode, arrows: 'to'});
-                    edges.push({from: cid, to: notNode, arrows: 'to'});
-                    edges.push({from: notNode, to: myId, arrows: 'to'});
-                });
-            }
-        }
-        return myId;
-    }
-
-    let finalId = traverse(currentAST);
-    let outId = addNode('OUTPUT', 'VAR');
-    edges.push({from: finalId, to: outId, arrows: 'to'});
-
-    let container = document.getElementById('circuit-canvas');
-    let data = { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) };
-    let options = {
-        layout: { hierarchical: { direction: 'LR', sortMethod: 'directed', levelSeparation: 150 } },
-        physics: false, edges: { smooth: { type: 'cubicBezier', forceDirection: 'horizontal' } }
-    };
-    
-    if (network) network.destroy();
-    network = new vis.Network(container, data, options);
-}
-
-// --- Output Verification Truth Table ---
-function generateOutputTT(ast, minterms, dontcares) {
-    let table = document.getElementById('output-tt');
-    let html = '<tr>';
-    for (let i = 0; i < numVars; i++) html += `<th>${vars[i]}</th>`;
-    html += '<th>Original Input</th><th class="match-col">Simplified Output</th><th>NAND Equiv</th><th>NOR Equiv</th></tr>';
-
-    for (let i = 0; i < Math.pow(2, numVars); i++) {
-        let isOriginal1 = minterms.includes(i);
-        let isX = dontcares.includes(i);
-        let origStr = isX ? 'X' : (isOriginal1 ? '1' : '0');
-        
-        // Since we ensure math equivalence via De Morgan's laws dynamically in the circuit generator, 
-        // the outputs for simplified, NAND, and NOR are inherently identical. 
-        // We evaluate against the original to prove validation.
-        
-        let simOut = isX ? '-' : (isOriginal1 ? '1' : '0'); 
-        
-        html += `<tr>`;
-        let bin = i.toString(2).padStart(numVars, '0');
-        for (let j = 0; j < numVars; j++) html += `<td>${bin[j]}</td>`;
-        html += `<td>${origStr}</td>
-                 <td class="match-col"><strong>${simOut}</strong></td>
-                 <td>${simOut}</td>
-                 <td>${simOut}</td></tr>`;
-    }
-    table.innerHTML = html;
-}
+.legend { margin-top: 10px; font-size: 0.9rem; color: var(--text-muted); }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 0.8rem; }
+.badge-1 { background: #d1fae5; color: #047857; }
+.badge-0 { background: #fee2e2; color: #b91c1c; }
+.badge-X { background: #f3f4f6; color: #4b5563; }
+.match-col { background-color: #f0fdf4 !important; font-weight: 600; color: #166534; }
