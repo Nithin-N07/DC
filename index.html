@@ -3,109 +3,132 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Boolean Logic Pro | Calculator & Minimizer</title>
-    <!-- Fonts & Icons -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <title>Boolean Master Pro | Logic Minimizer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Vis.js for Circuit Rendering -->
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <header>
-        <div class="logo"><i class="fas fa-microchip"></i> Boolean Logic Pro</div>
-        <nav>
-            <a href="#" class="active">Calculator</a>
-            <a href="https://github.com" target="_blank">Documentation</a>
-        </nav>
+    <header class="navbar">
+        <div class="nav-container">
+            <div class="brand"><i class="fas fa-project-diagram"></i> Boolean Master Pro</div>
+            <div class="nav-links">
+                <a href="#" class="active">Calculator</a>
+                <a href="#">About</a>
+            </div>
+        </div>
     </header>
 
-    <main class="container">
-        <!-- LEFT PANEL: INPUTS -->
-        <section class="panel input-panel">
-            <h2><i class="fas fa-keyboard"></i> Input Function</h2>
-            
-            <div class="tabs">
-                <button class="tab-btn active" onclick="switchTab('expr')">Expression</button>
-                <button class="tab-btn" onclick="switchTab('minterm')">Minterms</button>
-                <button class="tab-btn" onclick="switchTab('truthtable')">Truth Table</button>
+    <main class="main-container">
+        <!-- Input Section -->
+        <section class="card input-card">
+            <div class="card-header">
+                <h2>1. Enter Your Logic Function</h2>
+                <p>Select your preferred input method and enter the variables.</p>
             </div>
 
-            <!-- Tab 1: Boolean Expression -->
-            <div id="tab-expr" class="tab-content active">
-                <label>Enter Boolean Expression:</label>
-                <p class="hint">Use A-F. Operators: AND (*), OR (+), NOT ('), XOR (^). Example: A*B + C'</p>
-                <input type="text" id="bool-expr" placeholder="e.g., A*B + C'">
+            <div class="tab-navigation">
+                <button class="tab-btn active" onclick="switchTab('minterm')"><i class="fas fa-list-ol"></i> Minterms / Maxterms</button>
+                <button class="tab-btn" onclick="switchTab('truthtable')"><i class="fas fa-table"></i> Truth Table</button>
+                <button class="tab-btn" onclick="switchTab('expr')"><i class="fas fa-subscript"></i> Expression</button>
             </div>
 
-            <!-- Tab 2: Minterms/Maxterms -->
-            <div id="tab-minterm" class="tab-content">
-                <label>Variables (Max 6):</label>
-                <select id="var-count">
-                    <option value="2">2 (A, B)</option>
-                    <option value="3" selected>3 (A, B, C)</option>
-                    <option value="4">4 (A, B, C, D)</option>
-                    <option value="5">5 (A, B, C, D, E)</option>
-                    <option value="6">6 (A, B, C, D, E, F)</option>
-                </select>
-                <label>Type:</label>
-                <select id="term-type">
-                    <option value="m">Minterms ∑m</option>
-                    <option value="M">Maxterms ∏M</option>
-                </select>
-                <label>Values (comma separated):</label>
-                <input type="text" id="term-values" placeholder="e.g., 0, 1, 3, 7">
-            </div>
+            <div class="tab-body">
+                <!-- Tab: Minterms/Maxterms + Dummies -->
+                <div id="tab-minterm" class="tab-content active">
+                    <div class="input-group">
+                        <label>Number of Variables (Up to 6):</label>
+                        <select id="var-count" class="form-control">
+                            <option value="2">2 Variables (A, B)</option>
+                            <option value="3" selected>3 Variables (A, B, C)</option>
+                            <option value="4">4 Variables (A, B, C, D)</option>
+                            <option value="5">5 Variables (A, B, C, D, E)</option>
+                            <option value="6">6 Variables (A, B, C, D, E, F)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="input-row">
+                        <div class="input-group">
+                            <label>Base Terms:</label>
+                            <div class="term-selector">
+                                <select id="term-type">
+                                    <option value="m">Minterms (∑m)</option>
+                                    <option value="M">Maxterms (∏M)</option>
+                                </select>
+                                <input type="text" id="term-values" class="form-control" placeholder="e.g., 0, 1, 3, 7">
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label>Dummy Variables / Don't Cares (∑d):</label>
+                            <input type="text" id="dummy-values" class="form-control" placeholder="Optional: e.g., 2, 5">
+                            <small>Outputs that don't matter (can be 0 or 1)</small>
+                        </div>
+                    </div>
+                </div>
 
-            <!-- Tab 3: Truth Table Input -->
-            <div id="tab-truthtable" class="tab-content">
-                <label>Variables:</label>
-                <select id="tt-var-count" onchange="generateInputTT()">
-                    <option value="2">2 (A, B)</option>
-                    <option value="3" selected>3 (A, B, C)</option>
-                    <option value="4">4 (A, B, C, D)</option>
-                </select>
-                <div class="tt-scroll">
-                    <table id="input-tt">
-                        <!-- Generated via JS -->
-                    </table>
+                <!-- Tab: Truth Table -->
+                <div id="tab-truthtable" class="tab-content">
+                    <div class="input-group">
+                        <label>Number of Variables:</label>
+                        <select id="tt-var-count" class="form-control" onchange="generateInputTT()">
+                            <option value="2">2 (A, B)</option>
+                            <option value="3" selected>3 (A, B, C)</option>
+                            <option value="4">4 (A, B, C, D)</option>
+                        </select>
+                    </div>
+                    <div class="tt-wrapper">
+                        <table id="input-tt" class="truth-table"></table>
+                    </div>
+                    <p class="legend"><span class="badge badge-1">1</span> = True | <span class="badge badge-0">0</span> = False | <span class="badge badge-X">X</span> = Dummy (Don't Care)</p>
+                </div>
+
+                <!-- Tab: Expression -->
+                <div id="tab-expr" class="tab-content">
+                    <div class="input-group">
+                        <label>Boolean Expression:</label>
+                        <input type="text" id="bool-expr" class="form-control large-input" placeholder="e.g., A*B + C'">
+                        <small>Operators: AND ( <b>*</b> ), OR ( <b>+</b> ), NOT ( <b>'</b> ), XOR ( <b>^</b> )</small>
+                    </div>
                 </div>
             </div>
 
-            <button class="generate-btn" onclick="processInput()">Generate Logic <i class="fas fa-arrow-right"></i></button>
-            <div id="error-msg" class="error"></div>
+            <button class="btn btn-primary btn-block" onclick="processInput()">Solve & Generate Circuits <i class="fas fa-magic"></i></button>
+            <div id="error-msg" class="error-alert" style="display:none;"></div>
         </section>
 
-        <!-- RIGHT PANEL: OUTPUTS -->
-        <section class="panel output-panel" style="display: none;" id="output-section">
-            <h2><i class="fas fa-poll-h"></i> Results</h2>
-            
-            <div class="result-box">
-                <h3>Simplified Expression (SOP)</h3>
-                <div class="expression-display" id="simplified-expr">---</div>
+        <!-- Output Section (Hidden initially) -->
+        <section class="card output-card" id="output-section" style="display:none;">
+            <div class="card-header">
+                <h2>2. Solution & Diagrams</h2>
             </div>
 
-            <div class="output-tabs">
-                <button class="out-tab-btn active" onclick="switchOutTab('circuits')">Circuits</button>
-                <button class="out-tab-btn" onclick="switchOutTab('tt')">Truth Table & Verification</button>
+            <div class="result-banner">
+                <span>Simplified Boolean Expression:</span>
+                <div class="final-expression" id="simplified-expr"></div>
+            </div>
+
+            <div class="tab-navigation out-nav">
+                <button class="out-tab-btn active" onclick="switchOutTab('circuits')"><i class="fas fa-microchip"></i> Circuit Diagrams</button>
+                <button class="out-tab-btn" onclick="switchOutTab('tt')"><i class="fas fa-check-double"></i> Truth Table Verification</button>
             </div>
 
             <!-- Output: Circuits -->
             <div id="out-circuits" class="out-tab-content active">
-                <div class="circuit-subtabs">
-                    <button class="c-tab-btn active" onclick="drawCircuitType('basic')">Basic Gates</button>
-                    <button class="c-tab-btn" onclick="drawCircuitType('nand')">NAND Only</button>
-                    <button class="c-tab-btn" onclick="drawCircuitType('nor')">NOR Only</button>
+                <div class="circuit-toolbar">
+                    <button class="btn btn-outline active" onclick="drawCircuitType('basic', this)">Basic Logic Gates</button>
+                    <button class="btn btn-outline" onclick="drawCircuitType('nand', this)">NAND-Only Implementation</button>
+                    <button class="btn btn-outline" onclick="drawCircuitType('nor', this)">NOR-Only Implementation</button>
                 </div>
-                <!-- Circuit Diagram Container (Scrollable) -->
-                <div class="circuit-container" id="circuit-canvas"></div>
+                <div class="circuit-canvas-wrapper">
+                    <div id="circuit-canvas"></div>
+                </div>
             </div>
 
-            <!-- Output: Truth Table -->
+            <!-- Output: Verification Truth Table -->
             <div id="out-tt" class="out-tab-content">
-                <p class="hint">This verifies that the Original, Simplified, NAND, and NOR circuits produce <strong>identical</strong> outputs.</p>
-                <div class="tt-scroll">
-                    <table id="output-tt"></table>
+                <div class="tt-wrapper">
+                    <table id="output-tt" class="truth-table verification-table"></table>
                 </div>
             </div>
         </section>
